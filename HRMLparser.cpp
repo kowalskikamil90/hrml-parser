@@ -35,7 +35,7 @@ public:
 		const char *msg;
 	public:
 		HRLMParsingException(const char* str) { msg = str; }
-		const char* what() const throw () override { return this->msg; }
+		const char* what() const override { return this->msg; }
 	};
 
 private:
@@ -76,8 +76,9 @@ private:
 	class Attrib : public Element {
 	public:
 		string name;
-		bool hasValue = false;
-		bool hasEqSgn = false;
+		bool hasValue;
+		bool hasEqSgn;
+		Attrib() :hasValue(false), hasEqSgn(false) {}
 	};
 
 	class Value : public Element { 
@@ -106,34 +107,38 @@ private:
 		s = ret;
 	}
 
-	bool startsWith(string s, char c)
+	bool startsWith(string &s, char c)
 	{
-		if (s.size() < 1) throw HRLMParsingException("Invalid Tag token.");
+		if (s.size() < 1) return false;
 		if (s.front() == c) return true;
 		else return false;
 	}
 
-	bool startsWithAndIsAlNumAfter(string s, char c)
+	bool isAlNum(string &s)
 	{
-		if (s.size() < 1) throw HRLMParsingException("Tag-starting char but no tag name.");
-		if (s.front() == c && isalnum(s.at(1))) return true;
-		else return false;
+		for (auto c : s)
+		{
+			if (!isalnum(c))
+				return false;
+		}
+		return true;
 	}
 
-	bool startsWith(string s, string beg)
+	bool startsWith(string &s, string beg)
 	{
 		if (search(s.begin(), s.end(), beg.begin(), beg.end()) == s.begin()) return true;
 		else return false;
 	}
 
-	bool endsWith(string s, string beg)
+	bool endsWith(string &s, string beg)
 	{
 		if (search(s.begin(), s.end(), beg.begin(), beg.end()) == s.end() - 2) return true;
 		else return false;
 	}
 
-	bool endsWith(string s, char c)
+	bool endsWith(string &s, char c)
 	{
+		if (s.size() < 1) return false;
 		if (s.back() == c) return true;
 		else return false;
 	}
@@ -143,30 +148,40 @@ private:
 		if (tok.back() == '>')
 		{
 			closing = true;
+			tok.erase(tok.size() - 1);
 		}
 
-		bool ret = false;
-		if (tok.size() > 0 &&
-			startsWithAndIsAlNumAfter(tok, '<')) ret = true;
-		return ret;
+		if (startsWith(tok, '<'))
+		{
+			// At this point we know that we are dealing with a tag
+			if (closing) {
+				string tagName(tok.begin() + 1, tok.end() - 1);
+				if (isAlNum(tagName)) return true;
+				else HRLMParsingException("Tag name may contain only alfanumeric characters.");
+			}
+			else {
+				string tagName(tok.begin() + 1, tok.end());
+				if (isAlNum(tagName)) return true;
+				else HRLMParsingException("Tag name may contain only alfanumeric characters.");
+			}
+		}
+		return false;
 	}
 
 	bool isTagClosingToken(string tok)
 	{
-		return startsWith(tok, "</");
+		return startsWith(tok, string("</"));
 	}
 
 	bool isAttrib(string tok)
 	{
-		bool ret = true;
 		for (auto c : tok)
 		{
 			if (!isalnum(c)) {
-				ret = false;
-				break;
+				return false;
 			}
 		}
-		return ret;
+		return true;
 	}
 
 	bool isValue(string tok, bool& closing)
@@ -176,21 +191,18 @@ private:
 			closing = true;
 		}
 
+		// Value must be surrounded by quote characters
 		if (startsWith(tok, "\"") && endsWith(tok, "\""))
 			throw HRLMParsingException("Invalid attribute value. Missing quote character.");
 
 		string val(tok.begin() + 2, tok.end() - 2);
-		for (auto c : val)
-		{
-			if (!isalnum(c)) {
-				return false;
-			}
-		}
+		if (!isAlNum(val)) throw HRLMParsingException("Attribute value may consist of only alfanumeric characters.");
 		return true;
 	}
 
 	bool isEqualSign(string tok)
 	{
+		if (tok.size() < 1) return false;
 		if (tok.front() == '=')
 		{
 			if (tok.size() == 1) return true;
@@ -201,10 +213,11 @@ private:
 
 	bool isGrThan(string tok)
 	{
+		if (tok.size() < 1) return false;
 		if (tok.front() == '>')
 		{
 			if (tok.size() == 1) return true;
-			else throw HRLMParsingException("Unexpected character after tag closing '>'");
+			else throw HRLMParsingException("Unexpected character after tag closing");
 		}
 		else return false;
 	}
@@ -344,7 +357,7 @@ public:
 						break;
 					}
 					default: throw HRLMParsingException("New tag may appear only"
-						     " after closing of a tag or within a tag as a subtag");
+						   " after closing of a tag or within a tag as a subtag.");
 				}
 				break;
 			}
@@ -382,7 +395,7 @@ public:
 						break;
 					}
 					default: throw HRLMParsingException("Equal sign may appear only inside"
-					          " of a 'tag opening section', after attribute name. Between "
+					           " of a 'tag opening section', after attribute name. Between"
 				                " atribute name and value, only one equal sign is allowed.");
 				}
 				break;
@@ -446,7 +459,7 @@ public:
 			}
 			default:
 				{
-					throw HRLMParsingException("Validation fatal ERROR. No such element.");
+					throw HRLMParsingException("Validation internal fatal ERROR. No such element.");
 				}
 			}
 
@@ -480,22 +493,27 @@ public:
 /* Main function for testing */
 int main() {
 
-	//int nOfLines, nOfQueries;
-	//cin >> nOfLines >> nOfQueries;
-	//cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
 	vector<string> lines;
+
+	/*
+	int nOfLines, nOfQueries;
+	cin >> nOfLines >> nOfQueries;
+	cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
 	string line;
 
-	/* for (int i = 0; i < nOfLines; i++)
+	 for (int i = 0; i < nOfLines; i++)
 	{
 		getline(cin, line);
 		lines.push_back(line);
-	} */
+	}
+	*/
 
 	lines.push_back("<tag1 a1 = \"v1\">");
 	lines.push_back("<tag2 a2 = \"v2\">");
 	lines.push_back("<tag3 a3 = \"v3\" a4 = \"v4\">");
+	lines.push_back("<tag4 a1 = \"v33\" a2 = \"v44\">");
+	lines.push_back("</tag4>");
 	lines.push_back("</tag3>");
 	lines.push_back("</tag2>");
 	lines.push_back("</tag1>");
