@@ -33,8 +33,8 @@ public:
 	/* Public interface */
 	/////////////////////////////////////////////////////////////////////
 
-	void validateElementsList();
-	void extractTagsAndAttribs(vector<string>& lines);
+	void parseHRMLdocument(vector<string>& lines);
+	string processQuerry(string querry);
 	HRMLparser();
 	~HRMLparser();
 
@@ -82,4 +82,10 @@ private:
 	bool isValue(string tok, bool &closing);
 	bool isEqualSign(string tok);
 	bool isGrThan(string tok);
+
+	void validateElementsList();
+	void extractTagsAndAttribs(vector<string>& lines);
+
+	Tag* getChildTag(Tag *parent, string childsName);
+	string getAttributeValue(Tag *mostRecentTag, string attribute);
 };

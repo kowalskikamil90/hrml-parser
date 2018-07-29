@@ -6,20 +6,6 @@ int main() {
 
 	vector<string> lines;
 
-	/*
-	int nOfLines, nOfQueries;
-	cin >> nOfLines >> nOfQueries;
-	cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
-	string line;
-
-	for (int i = 0; i < nOfLines; i++)
-	{
-	getline(cin, line);
-	lines.push_back(line);
-	}
-	*/
-
 	lines.push_back("<tag1 a1 = \"1VALa1\">");
 	lines.push_back("	<tag2 a1 = \"2VALa1\" a2 = \"2VALa2\">");
 	lines.push_back("		<tag3 a1 = \"3VALa1\" a2 = \"3VALa2\">");
@@ -35,8 +21,9 @@ int main() {
 
 	HRMLparser parser;
 	try {
-		parser.extractTagsAndAttribs(lines);
-		parser.validateElementsList();
+		parser.parseHRMLdocument(lines);
+		string val = parser.processQuerry("tag1.tag2.tag3~a2");
+		cout << "VALUE of tag1.tag2.tag3~a2 is : " << val << endl;
 	}
 	catch (HRMLparser::ParsingError e) {
 		cerr << "Error code: " << e.getErrorCode() << endl << endl;

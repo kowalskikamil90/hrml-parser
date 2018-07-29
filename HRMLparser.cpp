@@ -8,7 +8,7 @@
 
 /* Pass pointer to parser to get the Error Description.
  * We want to keep exception class small so all error
- * descriptions are stored in the HRLMparser class. */
+ * descriptions are stored in the HRMLparser class. */
 HRMLparser::ParsingError::ParsingError(HRMLparser *parser, string errCode):
 	errorCode(errCode)
 {
@@ -228,44 +228,6 @@ bool HRMLparser::isGrThan(string tok)
 		else throw ParsingError(this, "E008");
 	}
 	else return false;
-}
-
-///////////////////////////////////////////////////////////
-/* Public methods */
-///////////////////////////////////////////////////////////
-
-HRMLparser::HRMLparser()
-{
-	errorDescription["E001"] = "Tag name may contain only alfanumeric characters.";
-	errorDescription["E002"] = "Invalid attribute name. Only alfanumeric characters allowed.";
-	errorDescription["E003"] = "Invalid attribute value. Missing ending quote character.";
-	errorDescription["E004"] = "Invalid attribute value. Missing starting quote character.";
-	errorDescription["E005"] = "No attribute value specified between the quotes.";
-	errorDescription["E006"] = "Attribute value may consist of only alfanumeric characters.";
-	errorDescription["E007"] = "Unexpected character after equal sign. Equal sign must be space seperated from attribute name and attribute value.";
-	errorDescription["E008"] = "Unexpected character after tag closing.";
-	errorDescription["E009"] = "Parsing internal fatal ERROR. No such element.";
-	errorDescription["E010"] = "First element must be a tag-opening element.";
-	errorDescription["E011"] = "New tag may appear only after closing of a tag or within a tag as a subtag.";
-	errorDescription["E012"] = "Attribute with such name already exists for this tag.";
-	errorDescription["E013"] = "Attribute may appear only inside of a tag opening section, either directly after tag name or after previous attribute value.";
-	errorDescription["E014"] = "Equal sign may appear only inside of a 'tag opening section', after attribute name. Between atribute name and value, only one equal sign is allowed.";
-	errorDescription["E015"] = "Attribute already has a value.";
-	errorDescription["E016"] = "Attribute value may appear only after the equal sign.";
-	errorDescription["E017"] = "Closing of 'tag opening'section may appear only after an attribute's value or after a 'tag opening' - in case there is no attributes.";
-	errorDescription["E018"] = "Closing tag name doesn't match the opening tag name.";
-	errorDescription["E019"] = "Closing tag may appear only after another closing tag or after closing of 'tag opening section'.";
-	errorDescription["E020"] = "Validation internal fatal ERROR. No such element.";
-	errorDescription["E021"] = "Closing of tag missing.";
-	errorDescription["E022"] = "Closing of 'tag opening section' missing.";
-	errorDescription["E023"] = "Missing equal sign for attribute.";
-	errorDescription["E024"] = "Missing value for attribute.";
-}
-
-HRMLparser::~HRMLparser()
-{
-	for (auto e : this->listOfElems)
-		delete e;
 }
 
 void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
@@ -520,4 +482,114 @@ void HRMLparser::validateElementsList()
 		}
 		}
 	}
+}
+
+HRMLparser::Tag* HRMLparser::getChildTag(Tag *parent, string childsName)
+{
+	for (auto tag : parent->childs)
+	{
+		if (tag->name == childsName) return tag;
+	}
+	return nullptr;	
+}
+
+string HRMLparser::getAttributeValue(Tag *mostRecentTag, string attribute)
+{
+	string value;
+	try {
+		value = mostRecentTag->attribs.at(attribute);
+	}
+	catch (out_of_range e) {
+		return "NULL";
+	}
+	return value;
+}
+
+///////////////////////////////////////////////////////////
+/* Public methods */
+///////////////////////////////////////////////////////////
+
+HRMLparser::HRMLparser()
+{
+	errorDescription["E001"] = "Tag name may contain only alfanumeric characters.";
+	errorDescription["E002"] = "Invalid attribute name. Only alfanumeric characters allowed.";
+	errorDescription["E003"] = "Invalid attribute value. Missing ending quote character.";
+	errorDescription["E004"] = "Invalid attribute value. Missing starting quote character.";
+	errorDescription["E005"] = "No attribute value specified between the quotes.";
+	errorDescription["E006"] = "Attribute value may consist of only alfanumeric characters.";
+	errorDescription["E007"] = "Unexpected character after equal sign. Equal sign must be space seperated from attribute name and attribute value.";
+	errorDescription["E008"] = "Unexpected character after tag closing.";
+	errorDescription["E009"] = "Parsing internal fatal ERROR. No such element.";
+	errorDescription["E010"] = "First element must be a tag-opening element.";
+	errorDescription["E011"] = "New tag may appear only after closing of a tag or within a tag as a subtag.";
+	errorDescription["E012"] = "Attribute with such name already exists for this tag.";
+	errorDescription["E013"] = "Attribute may appear only inside of a tag opening section, either directly after tag name or after previous attribute value.";
+	errorDescription["E014"] = "Equal sign may appear only inside of a 'tag opening section', after attribute name. Between atribute name and value, only one equal sign is allowed.";
+	errorDescription["E015"] = "Attribute already has a value.";
+	errorDescription["E016"] = "Attribute value may appear only after the equal sign.";
+	errorDescription["E017"] = "Closing of 'tag opening'section may appear only after an attribute's value or after a 'tag opening' - in case there is no attributes.";
+	errorDescription["E018"] = "Closing tag name doesn't match the opening tag name.";
+	errorDescription["E019"] = "Closing tag may appear only after another closing tag or after closing of 'tag opening section'.";
+	errorDescription["E020"] = "Validation internal fatal ERROR. No such element.";
+	errorDescription["E021"] = "Closing of tag missing.";
+	errorDescription["E022"] = "Closing of 'tag opening section' missing.";
+	errorDescription["E023"] = "Missing equal sign for attribute.";
+	errorDescription["E024"] = "Missing value for attribute.";
+	errorDescription["Q001"] = "Couldn't find ~ character in querry, to denote an attribute name.";
+	errorDescription["Q002"] = "Such root tag does not exist.";
+	errorDescription["Q003"] = "Such child tag does not exist.";
+	errorDescription["Q004"] = "Such attribute does not exist for specified tag.";
+}
+
+HRMLparser::~HRMLparser()
+{
+	for (auto e : this->listOfElems)
+		delete e;
+}
+
+void HRMLparser::parseHRMLdocument(vector<string>& lines)
+{
+	extractTagsAndAttribs(lines);
+	validateElementsList();
+}
+
+string HRMLparser::processQuerry(string querry)
+{
+	stringstream ss(querry);
+	vector<string> tagsChain;
+	string attribute;
+	string tok;
+
+	while (!ss.eof())
+	{
+		getline(ss, tok, '.');
+		tagsChain.push_back(tok);
+	}
+
+	string lastTagAndAttr(tagsChain.back());
+	auto found = lastTagAndAttr.find('~');
+	tagsChain.erase(tagsChain.end()-1);
+	if ( found == string::npos)	{
+		throw ParsingError(this, "Q001");
+	}
+	else {
+		tagsChain.push_back(string(lastTagAndAttr.begin(), lastTagAndAttr.begin() + found));
+		attribute = string(lastTagAndAttr.begin() + found +1, lastTagAndAttr.end());
+	}
+
+	if (tagsChain.front() != rootTag->name)
+		throw ParsingError(this, "Q002");
+
+	Tag *mostRecentTag = rootTag;
+	for (unsigned int i = 1; i < tagsChain.size(); i++)
+	{
+		Tag *childTag = getChildTag(mostRecentTag, tagsChain.at(i));
+		if (childTag == nullptr) throw ParsingError(this, "Q003");
+		mostRecentTag = childTag;
+	}
+
+	string value = getAttributeValue(mostRecentTag, attribute);
+	if (value == "NULL") throw ParsingError(this, "Q004");
+
+	return value;
 }

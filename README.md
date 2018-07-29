@@ -8,7 +8,7 @@ In the querry interpreter the attributes are referenced as:  tag1[tilde]value   
 
 The tool parses HRML document and internally generates a DOM (document object model) that later on may be accessed by a querry interpreter (which is also a part of this tool).
 
-Currently, following signaling (exceptions) to the client is available:
+# Currently, following signaling (exceptions) to the client is available:
 ["E001"] = "Tag name may contain only alfanumeric characters."
 ["E002"] = "Invalid attribute name. Only alfanumeric characters allowed."
 ["E003"] = "Invalid attribute value. Missing ending quote character."
@@ -33,3 +33,8 @@ Currently, following signaling (exceptions) to the client is available:
 ["E022"] = "Closing of 'tag opening section' missing."
 ["E023"] = "Missing equal sign for attribute."
 ["E024"] = "Missing value for attribute."
+
+["Q001"] = "Couldn't find ~ character in querry, to denote an attribute name."
+["Q002"] = "Such root tag does not exist."
+["Q003"] = "Such child tag does not exist."
+["Q004"] = "Such attribute does not exist for specified tag."
