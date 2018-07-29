@@ -20,9 +20,9 @@ int main() {
 	}
 	*/
 
-	lines.push_back("<tag1 a1 = \"v1\">");
-	lines.push_back("<tag2 a2 = \"v2\">");
-	lines.push_back("<tag3 a3 = \"v3\" a4 = \"v4\">");
+	lines.push_back("<tag1 a1 = \"v1\" >");
+	lines.push_back("<tag2 a2 = \"v2\" a343 = \"asd\" >");
+	lines.push_back("<tag3 a3 = \"v3\" a4 = \"v4\" >");
 	lines.push_back("<tag4 a1 = \"v33\" a2 = \"v44\">");
 	lines.push_back("</tag4>");
 	lines.push_back("</tag3>");

@@ -104,7 +104,7 @@ bool HRMLparser::startsWith(string &s, string beg)
 
 bool HRMLparser::endsWith(string &s, string beg)
 {
-	if (search(s.begin(), s.end(), beg.begin(), beg.end()) == s.end() - 2) return true;
+	if ((search(s.begin()+1, s.end(), beg.begin(), beg.end())) == s.end() - 1) return true;
 	else return false;
 }
 
@@ -147,29 +147,58 @@ bool HRMLparser::isTagClosingToken(string tok)
 
 bool HRMLparser::isAttrib(string tok)
 {
-	for (auto c : tok)
-	{
-		if (!isalnum(c)) {
-			return false;
+	if (!startsWith(tok, '<') &&
+		!startsWith(tok, '"') &&
+		!startsWith(tok, '=') &&
+		!endsWith(tok, '"') &&
+		!endsWith(tok, '>')) {
+		for (auto c : tok)
+		{
+			if (!isalnum(c)) {
+				throw ParsingError("Invalid attribute name. Only alfanumeric characters allowed.");
+			}
 		}
+		return true;
 	}
-	return true;
+	return false;
 }
 
 bool HRMLparser::isValue(string tok, bool& closing)
 {
-	if (tok.back() == '>')
-	{
-		closing = true;
+	if (tok.size() > 2) {
+		if (tok.back() == '>')
+		{
+			tok.pop_back();
+			closing = true;
+		}
+
+		bool consideAsValue = false;
+
+		// Value must be surrounded by quote characters
+		if (startsWith(tok, "\"") && endsWith(tok, "\"")) {
+			consideAsValue = true;
+		}
+		else if (startsWith(tok, "\"") && !endsWith(tok, "\"")) {
+			consideAsValue = true;
+			throw ParsingError("Invalid attribute value. Missing ending quote character.");
+		}
+		else if (!startsWith(tok, "\"") && endsWith(tok, "\"")) {
+			consideAsValue = true;
+			throw ParsingError("Invalid attribute value. Missing starting quote character.");
+		}
+
+		if (consideAsValue && tok.size() >= 2) {
+			string val(tok.begin() + 1, tok.end() - 1);
+			if (val.empty()) throw ParsingError("No attribute value specified between the quotes.");
+			if (!isAlNum(val)) throw ParsingError("Attribute value may consist of only alfanumeric characters.");
+			return true;
+		}
+		return false;
 	}
-
-	// Value must be surrounded by quote characters
-	if (startsWith(tok, "\"") && endsWith(tok, "\""))
-		throw ParsingError("Invalid attribute value. Missing quote character.");
-
-	string val(tok.begin() + 2, tok.end() - 2);
-	if (!isAlNum(val)) throw ParsingError("Attribute value may consist of only alfanumeric characters.");
-	return true;
+	else {
+		return false;
+	}
+	
 }
 
 bool HRMLparser::isEqualSign(string tok)
@@ -178,7 +207,9 @@ bool HRMLparser::isEqualSign(string tok)
 	if (tok.front() == '=')
 	{
 		if (tok.size() == 1) return true;
-		else throw ParsingError("Unexpected character after equal sign");
+		else throw ParsingError("Unexpected character after equal sign. "
+		                        "Equal sign must be space seperated from "
+		                        "attribute name and attribute value.");
 	}
 	else return false;
 }
@@ -218,6 +249,11 @@ void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
 
 	for (auto t : tokens)
 	{
+
+		if (t == "a3$43") {
+			int x = 5;
+		}
+
 		bool closing = false;
 
 		// opening of a tag
@@ -291,6 +327,10 @@ void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
 			s->elemType = ElemType::GT;
 
 			listOfElems.push_back(s);
+		}
+
+		else {
+			throw ParsingError("Parsing internal fatal ERROR. No such element.");
 		}
 	}
 }
