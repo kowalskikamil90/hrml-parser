@@ -1,534 +1,464 @@
-// HRMLparser.cpp : Defines the entry point for the console application.
-//
-
 #include "stdafx.h" 
+#include "HRMLparser.h"
 
-//////////////////////////////////////////
+///////////////////////////////////////////////////////////
+/* Public exception class */
+/* Exception specific for a parser, exposed to a user of a library.*/
+///////////////////////////////////////////////////////////
 
-#include <vector>
-#include <iostream>
-#include <algorithm>
-#include <string>
-#include <sstream>
-#include <map>
-#include <exception>
-#include <cctype>
+HRMLparser::ParsingError::ParsingError(const char* str) { msg = str; }
+const char* HRMLparser::ParsingError::what() const { return this->msg; }
 
-using namespace std;
+///////////////////////////////////////////////////////////
+/* Private enum type */
+///////////////////////////////////////////////////////////
 
-class Attrib;
-class Value;
-class Tag;
-class Element;
-class TagClose;
-class GreaterThan;
-class EqualSign;
+enum class HRMLparser::ElemType {
+	TAG_OPEN,			// <tag1..
+	TAG_CLOSE,			// </tag1>
+	ATTRIB,				// someAttr
+	VALUE,				// "someVal"
+	EQUAL_SGN,			// =
+	GT					// > -> ending of "tag opening section"
+};
 
-/**************************************************************/
-class HRMLparser {
+///////////////////////////////////////////////////////////
+/* Private classes */
+///////////////////////////////////////////////////////////
 
+class HRMLparser::Element {
 public:
-	/* Nested class */
-	/* Exception specific for a parser, exposed to a user of a library.*/
-	class HRLMParsingException : public exception {
-	private:
-		const char *msg;
-	public:
-		HRLMParsingException(const char* str) { msg = str; }
-		const char* what() const override { return this->msg; }
-	};
+	ElemType elemType;
+	virtual ~Element() {}
+};
 
-private:
-	/* Possible elements */
-
-	/* Nested enum */
-	enum class ElemType {
-		TAG_OPEN,			// <tag1..
-		TAG_CLOSE,			// </tag1>
-		ATTRIB,				// someAttr
-		VALUE,				// "someVal"
-		EQUAL_SGN,			// =
-		GT					// > -> ending of "tag opening section"
-	};
-
-	/* Nested classes */
-	class Element {
-	public:
-		ElemType elemType;
-		virtual ~Element(){}
-	};
-
-	class Tag : public Element {
-	public:
-		string name;
-		bool hasClosing;
-		bool hasClosingOfOpenSection;
-		map<string, string> attribs;
-		vector<Tag*> childs;
-		Tag() : hasClosing(false), hasClosingOfOpenSection(false) {}
-		};
-
-	class TagClose : public Element {
-	public:
-		string name;
-	};
-
-	class Attrib : public Element {
-	public:
-		string name;
-		bool hasValue;
-		bool hasEqSgn;
-		Attrib() :hasValue(false), hasEqSgn(false) {}
-	};
-
-	class Value : public Element { 
-	public:
-		Value() {};
-		Value(string v) : value(v) {};
-		string value;
-	};
-
-	class EqualSign : public Element {};
-	class GreaterThan : public Element {};
-
-	/**************************************************************/
-
-	Tag *rootTag;
-	vector<string> tokens;
-	vector<Element*> listOfElems;
-
-	void leaveOnlyAlNumChars(string& s)
-	{
-		string ret;
-		for (auto c : s)
-		{
-			if (isalnum(c)) ret.push_back(c);
-		}
-		s = ret;
-	}
-
-	bool startsWith(string &s, char c)
-	{
-		if (s.size() < 1) return false;
-		if (s.front() == c) return true;
-		else return false;
-	}
-
-	bool isAlNum(string &s)
-	{
-		for (auto c : s)
-		{
-			if (!isalnum(c))
-				return false;
-		}
-		return true;
-	}
-
-	bool startsWith(string &s, string beg)
-	{
-		if (search(s.begin(), s.end(), beg.begin(), beg.end()) == s.begin()) return true;
-		else return false;
-	}
-
-	bool endsWith(string &s, string beg)
-	{
-		if (search(s.begin(), s.end(), beg.begin(), beg.end()) == s.end() - 2) return true;
-		else return false;
-	}
-
-	bool endsWith(string &s, char c)
-	{
-		if (s.size() < 1) return false;
-		if (s.back() == c) return true;
-		else return false;
-	}
-
-	bool isTagOpenningToken(string tok, bool closing)
-	{
-		if (tok.back() == '>')
-		{
-			closing = true;
-			tok.erase(tok.size() - 1);
-		}
-
-		if (startsWith(tok, '<'))
-		{
-			// At this point we know that we are dealing with a tag
-			if (closing) {
-				string tagName(tok.begin() + 1, tok.end() - 1);
-				if (isAlNum(tagName)) return true;
-				else HRLMParsingException("Tag name may contain only alfanumeric characters.");
-			}
-			else {
-				string tagName(tok.begin() + 1, tok.end());
-				if (isAlNum(tagName)) return true;
-				else HRLMParsingException("Tag name may contain only alfanumeric characters.");
-			}
-		}
-		return false;
-	}
-
-	bool isTagClosingToken(string tok)
-	{
-		return startsWith(tok, string("</"));
-	}
-
-	bool isAttrib(string tok)
-	{
-		for (auto c : tok)
-		{
-			if (!isalnum(c)) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	bool isValue(string tok, bool& closing)
-	{
-		if (tok.back() == '>')
-		{
-			closing = true;
-		}
-
-		// Value must be surrounded by quote characters
-		if (startsWith(tok, "\"") && endsWith(tok, "\""))
-			throw HRLMParsingException("Invalid attribute value. Missing quote character.");
-
-		string val(tok.begin() + 2, tok.end() - 2);
-		if (!isAlNum(val)) throw HRLMParsingException("Attribute value may consist of only alfanumeric characters.");
-		return true;
-	}
-
-	bool isEqualSign(string tok)
-	{
-		if (tok.size() < 1) return false;
-		if (tok.front() == '=')
-		{
-			if (tok.size() == 1) return true;
-			else throw HRLMParsingException("Unexpected character after equal sign");
-		}
-		else return false;
-	}
-
-	bool isGrThan(string tok)
-	{
-		if (tok.size() < 1) return false;
-		if (tok.front() == '>')
-		{
-			if (tok.size() == 1) return true;
-			else throw HRLMParsingException("Unexpected character after tag closing");
-		}
-		else return false;
-	}
-
+class HRMLparser::Tag : public HRMLparser::Element {
 public:
+	string name;
+	bool hasClosing;
+	bool hasClosingOfOpenSection;
+	map<string, string> attribs;
+	vector<Tag*> childs;
+	Tag() : hasClosing(false), hasClosingOfOpenSection(false) {}
+};
 
-	~HRMLparser()
+class HRMLparser::TagClose : public HRMLparser::Element {
+public:
+	string name;
+};
+
+class HRMLparser::Attrib : public HRMLparser::Element {
+public:
+	string name;
+	bool hasValue;
+	bool hasEqSgn;
+	Attrib() :hasValue(false), hasEqSgn(false) {}
+};
+
+class HRMLparser::Value : public HRMLparser::Element {
+public:
+	Value() {};
+	Value(string v) : value(v) {};
+	string value;
+};
+
+class HRMLparser::EqualSign : public HRMLparser::Element {};
+class HRMLparser::GreaterThan : public HRMLparser::Element {};
+
+///////////////////////////////////////////////////////////
+/* Private methods */
+///////////////////////////////////////////////////////////
+
+void HRMLparser::leaveOnlyAlNumChars(string& s)
+{
+	string ret;
+	for (auto c : s)
 	{
-		for (auto e : this->listOfElems)
-			delete e;
+		if (isalnum(c)) ret.push_back(c);
+	}
+	s = ret;
+}
+
+bool HRMLparser::startsWith(string &s, char c)
+{
+	if (s.size() < 1) return false;
+	if (s.front() == c) return true;
+	else return false;
+}
+
+bool HRMLparser::isAlNum(string &s)
+{
+	for (auto c : s)
+	{
+		if (!isalnum(c))
+			return false;
+	}
+	return true;
+}
+
+bool HRMLparser::startsWith(string &s, string beg)
+{
+	if (search(s.begin(), s.end(), beg.begin(), beg.end()) == s.begin()) return true;
+	else return false;
+}
+
+bool HRMLparser::endsWith(string &s, string beg)
+{
+	if (search(s.begin(), s.end(), beg.begin(), beg.end()) == s.end() - 2) return true;
+	else return false;
+}
+
+bool HRMLparser::endsWith(string &s, char c)
+{
+	if (s.size() < 1) return false;
+	if (s.back() == c) return true;
+	else return false;
+}
+
+bool HRMLparser::isTagOpenningToken(string tok, bool closing)
+{
+	if (tok.back() == '>')
+	{
+		closing = true;
+		tok.erase(tok.size() - 1);
 	}
 
-	void extractTagsAndAttribs(vector<string>& lines)
+	if (startsWith(tok, '<'))
 	{
-		string token;
-		for (auto l : lines)
-		{
-			stringstream ss(l);
-			while (!ss.eof()) {
-				ss >> token;
-				tokens.push_back(token);
-			}
+		// At this point we know that we are dealing with a tag
+		if (closing) {
+			string tagName(tok.begin() + 1, tok.end() - 1);
+			if (isAlNum(tagName)) return true;
+			else ParsingError("Tag name may contain only alfanumeric characters.");
 		}
+		else {
+			string tagName(tok.begin() + 1, tok.end());
+			if (isAlNum(tagName)) return true;
+			else ParsingError("Tag name may contain only alfanumeric characters.");
+		}
+	}
+	return false;
+}
 
-		for (auto t : tokens)
-		{
-			bool closing = false;
+bool HRMLparser::isTagClosingToken(string tok)
+{
+	return startsWith(tok, string("</"));
+}
 
-			// opening of a tag
-			if (isTagOpenningToken(t, closing)) {
-				Tag *tag = new Tag();
-				tag->elemType = ElemType::TAG_OPEN;
+bool HRMLparser::isAttrib(string tok)
+{
+	for (auto c : tok)
+	{
+		if (!isalnum(c)) {
+			return false;
+		}
+	}
+	return true;
+}
 
-				if (closing)
-				{
-					tag->name = t.substr(1, t.size()-1);
-					listOfElems.push_back(tag);
+bool HRMLparser::isValue(string tok, bool& closing)
+{
+	if (tok.back() == '>')
+	{
+		closing = true;
+	}
 
-					// Push also 'ending of a tag'
-					GreaterThan *e = new GreaterThan();
-					e->elemType = ElemType::GT;
+	// Value must be surrounded by quote characters
+	if (startsWith(tok, "\"") && endsWith(tok, "\""))
+		throw ParsingError("Invalid attribute value. Missing quote character.");
 
-					listOfElems.push_back(e);
-				}
-				else {
-					tag->name = t.substr(1);
-					listOfElems.push_back(tag);
-				}
-			}
+	string val(tok.begin() + 2, tok.end() - 2);
+	if (!isAlNum(val)) throw ParsingError("Attribute value may consist of only alfanumeric characters.");
+	return true;
+}
 
-			// ending of a tag
-			else if (isTagClosingToken(t)) {
-				TagClose *tc = new TagClose();
-				tc->name = t.substr(2, t.size() - 3);
-				tc->elemType = ElemType::TAG_CLOSE;
+bool HRMLparser::isEqualSign(string tok)
+{
+	if (tok.size() < 1) return false;
+	if (tok.front() == '=')
+	{
+		if (tok.size() == 1) return true;
+		else throw ParsingError("Unexpected character after equal sign");
+	}
+	else return false;
+}
 
-				listOfElems.push_back(tc);
-			}
+bool HRMLparser::isGrThan(string tok)
+{
+	if (tok.size() < 1) return false;
+	if (tok.front() == '>')
+	{
+		if (tok.size() == 1) return true;
+		else throw ParsingError("Unexpected character after tag closing");
+	}
+	else return false;
+}
 
-			// attribute name
-			else if (isAttrib(t)) {
-				Attrib *a =  new Attrib();
-				a->name = t;
-				a->elemType = ElemType::ATTRIB;
+///////////////////////////////////////////////////////////
+/* Public methods */
+///////////////////////////////////////////////////////////
 
-				listOfElems.push_back(a);
-			}
+HRMLparser::~HRMLparser()
+{
+	for (auto e : this->listOfElems)
+		delete e;
+}
 
-			// equal sign
-			else if (isEqualSign(t)) {
-				EqualSign *e = new EqualSign();
-				e->elemType = ElemType::EQUAL_SGN;
+void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
+{
+	string token;
+	for (auto l : lines)
+	{
+		stringstream ss(l);
+		while (!ss.eof()) {
+			ss >> token;
+			tokens.push_back(token);
+		}
+	}
+
+	for (auto t : tokens)
+	{
+		bool closing = false;
+
+		// opening of a tag
+		if (isTagOpenningToken(t, closing)) {
+			Tag *tag = new Tag();
+			tag->elemType = ElemType::TAG_OPEN;
+
+			if (closing)
+			{
+				tag->name = t.substr(1, t.size() - 1);
+				listOfElems.push_back(tag);
+
+				// Push also 'ending of a tag'
+				GreaterThan *e = new GreaterThan();
+				e->elemType = ElemType::GT;
 
 				listOfElems.push_back(e);
 			}
-
-			// attribute value
-			else if (isValue(t, closing)) {
-				Value *v = new Value();
-				v->value = t.substr(1, t.size() - 3);
-				v->elemType = ElemType::VALUE;
-
-				listOfElems.push_back(v);
-
-				if (closing)
-				{
-					GreaterThan *e = new GreaterThan();
-					e->elemType = ElemType::GT;
-
-					listOfElems.push_back(e);
-				}
+			else {
+				tag->name = t.substr(1);
+				listOfElems.push_back(tag);
 			}
+		}
 
-			// standalone closing of 'tag opening section'
-			else if (isGrThan(t)) {
-				GreaterThan	*s = new GreaterThan();
-				s->elemType = ElemType::GT;
+		// ending of a tag
+		else if (isTagClosingToken(t)) {
+			TagClose *tc = new TagClose();
+			tc->name = t.substr(2, t.size() - 3);
+			tc->elemType = ElemType::TAG_CLOSE;
 
-				listOfElems.push_back(s);
+			listOfElems.push_back(tc);
+		}
+
+		// attribute name
+		else if (isAttrib(t)) {
+			Attrib *a = new Attrib();
+			a->name = t;
+			a->elemType = ElemType::ATTRIB;
+
+			listOfElems.push_back(a);
+		}
+
+		// equal sign
+		else if (isEqualSign(t)) {
+			EqualSign *e = new EqualSign();
+			e->elemType = ElemType::EQUAL_SGN;
+
+			listOfElems.push_back(e);
+		}
+
+		// attribute value
+		else if (isValue(t, closing)) {
+			Value *v = new Value();
+			v->value = t.substr(1, t.size() - 3);
+			v->elemType = ElemType::VALUE;
+
+			listOfElems.push_back(v);
+
+			if (closing)
+			{
+				GreaterThan *e = new GreaterThan();
+				e->elemType = ElemType::GT;
+
+				listOfElems.push_back(e);
 			}
+		}
+
+		// standalone closing of 'tag opening section'
+		else if (isGrThan(t)) {
+			GreaterThan	*s = new GreaterThan();
+			s->elemType = ElemType::GT;
+
+			listOfElems.push_back(s);
 		}
 	}
+}
 
-	void validateElementsList()
+void HRMLparser::validateElementsList()
+{
+	Element *firstElem = listOfElems.at(0);
+	if (firstElem->elemType != ElemType::TAG_OPEN)
+		throw ParsingError("First element must be a tag-opening element.");
+	else {
+		/* We can also use dynamic cast here, but we are sure at this point that
+		* we point to Tag so we can use static_cast as well.*/
+		Tag *t = static_cast<Tag*>(firstElem);
+		rootTag = t;
+	}
+
+	vector<Tag*> mostRecentTags;
+	mostRecentTags.push_back(rootTag);
+	Attrib *mostRecentAttrib = nullptr;
+	Element *prevElem = firstElem;
+
+	for (auto it = listOfElems.begin() + 1; it != listOfElems.end(); it++)
 	{
-		Element *firstElem = listOfElems.at(0);
-		if (firstElem->elemType != ElemType::TAG_OPEN)
-			throw HRLMParsingException("First element must be a tag-opening element.");
-		else {
-			/* We can also use dynamic cast here, but we are sure at this point that
-			 * we point to Tag so we can use static_cast as well.*/
-			Tag *t = static_cast<Tag*>(firstElem);
-			rootTag = t;
-		}
-
-		vector<Tag*> mostRecentTags;
-		mostRecentTags.push_back(rootTag);
-		Attrib *mostRecentAttrib = nullptr;
-		Element *prevElem = firstElem;
-
-		for (auto it = listOfElems.begin()+1; it != listOfElems.end(); it++)
+		Element *e = *it;
+		switch (e->elemType)
 		{
-			Element *e = *it;
-			switch (e->elemType)
+		case ElemType::TAG_OPEN:
+		{
+			switch (prevElem->elemType)
 			{
-			case ElemType::TAG_OPEN:
-			{
-				switch (prevElem->elemType)
-				{
-					// These are valid cases
-					case ElemType::TAG_CLOSE:
-					case ElemType::GT:
-					{
-						Tag *nextTag = static_cast<Tag*>(e);
-						mostRecentTags.back()->childs.push_back(nextTag);
-						mostRecentTags.push_back(nextTag);
-						break;
-					}
-					default: throw HRLMParsingException("New tag may appear only"
-						   " after closing of a tag or within a tag as a subtag.");
-				}
-				break;
-			}
-			case ElemType::ATTRIB:
-			{
-				switch (prevElem->elemType)
-				{
-					// These are valid cases
-					case ElemType::TAG_OPEN:
-					case ElemType::VALUE:
-					{
-						Attrib *a = static_cast<Attrib*>(e);
-						mostRecentAttrib = a;
-						if (mostRecentTags.back()->attribs.count(a->name) != 0)
-							throw HRLMParsingException("Attribute with such name"
-								                  " already exists for this tag.");
-						// No value parsed yet. For now assign NULL.
-						mostRecentTags.back()->attribs[a->name] = "NULL";
-						break;
-					}
-					default: throw HRLMParsingException("Attribute may appear only"
-						        " inside of a tag opening section, either directly"
-						       " after tag name or after previous attribute value.");
-				}
-				break;
-			}
-			case ElemType::EQUAL_SGN:
-			{
-				switch (prevElem->elemType)
-				{
-					// This is valid case
-					case ElemType::ATTRIB:
-					{
-						mostRecentAttrib->hasEqSgn = true;
-						break;
-					}
-					default: throw HRLMParsingException("Equal sign may appear only inside"
-					           " of a 'tag opening section', after attribute name. Between"
-				                " atribute name and value, only one equal sign is allowed.");
-				}
-				break;
-			}
-			case ElemType::VALUE:
-			{
-				switch (prevElem->elemType)
-				{
-					// These are valid cases
-					case ElemType::EQUAL_SGN:
-					{
-						Value *v = static_cast<Value*>(e);
-						if (mostRecentTags.back()->attribs.at(mostRecentAttrib->name) != "NULL")
-							throw HRLMParsingException("Attribute already has a value.");
-						mostRecentTags.back()->attribs[mostRecentAttrib->name] = v->value;
-						mostRecentAttrib->hasValue = true;
-						break;
-					}
-					default: throw HRLMParsingException("Attribute value may appear"
-						                               " only after the equal sign.");
-				}
-				break;
-			}
+				// These are valid cases
+			case ElemType::TAG_CLOSE:
 			case ElemType::GT:
 			{
-				switch (prevElem->elemType)
-					{
-						// These are valid cases
-					case ElemType::VALUE:
-					case ElemType::TAG_OPEN:
-					{
-						mostRecentTags.back()->hasClosingOfOpenSection = true;
-						break;
-					}
-					default: throw HRLMParsingException("Closing of 'tag opening'section"
-						          " may appear only after an attribute's value or after "
-					                 " a 'tag opening' - in case there is no attributes.");
-					}
+				Tag *nextTag = static_cast<Tag*>(e);
+				mostRecentTags.back()->childs.push_back(nextTag);
+				mostRecentTags.push_back(nextTag);
 				break;
 			}
-			case ElemType::TAG_CLOSE:
-			{
-				switch (prevElem->elemType)
-				{
-					// These are valid cases
-					case ElemType::TAG_CLOSE:
-					case ElemType::GT:
-					{
-						TagClose *tc = static_cast<TagClose*>(e);
-						if (mostRecentTags.back()->name != tc->name)
-							throw HRLMParsingException("Closing tag name doesn't match the opening tag name.");
-						mostRecentTags.back()->hasClosing = true;
-						mostRecentTags.pop_back();
-						break;
-					}
-					default: throw HRLMParsingException("Closing tag may appear only"
-						                        " after another closing tag or after"
-						                         " closing of 'tag opening section'.");
-				}
-				break;
+			default: throw ParsingError("New tag may appear only"
+				" after closing of a tag or within a tag as a subtag.");
 			}
-			default:
-				{
-					throw HRLMParsingException("Validation internal fatal ERROR. No such element.");
-				}
-			}
-
-			prevElem = e;
+			break;
 		}
-
-		/* Final validation. Check if all tags are closed. Check if all attributes have
-		 * equal signs before the attribute value.*/
-		for (auto &e : listOfElems)
+		case ElemType::ATTRIB:
 		{
-			switch (e->elemType)
+			switch (prevElem->elemType)
 			{
-				case ElemType::TAG_OPEN:
-				{
-					Tag *tag = static_cast<Tag*>(e);
-					if (!tag->hasClosing) throw HRLMParsingException("Closing of tag missing.");
-					else if (!tag->hasClosingOfOpenSection)
-						throw HRLMParsingException("Closing of 'tag opening section' missing.");
-				}
-				case ElemType::ATTRIB:
-				{
-					Attrib *a = static_cast<Attrib*>(e);
-					if (!a->hasEqSgn) throw HRLMParsingException("Missing equal sign for attribute.");
-					if (!a->hasValue) throw HRLMParsingException("Missing value for attribute.");
-				}
+				// These are valid cases
+			case ElemType::TAG_OPEN:
+			case ElemType::VALUE:
+			{
+				Attrib *a = static_cast<Attrib*>(e);
+				mostRecentAttrib = a;
+				if (mostRecentTags.back()->attribs.count(a->name) != 0)
+					throw ParsingError("Attribute with such name"
+						" already exists for this tag.");
+				// No value parsed yet. For now assign NULL.
+				mostRecentTags.back()->attribs[a->name] = "NULL";
+				break;
 			}
+			default: throw ParsingError("Attribute may appear only"
+				" inside of a tag opening section, either directly"
+				" after tag name or after previous attribute value.");
+			}
+			break;
+		}
+		case ElemType::EQUAL_SGN:
+		{
+			switch (prevElem->elemType)
+			{
+				// This is valid case
+			case ElemType::ATTRIB:
+			{
+				mostRecentAttrib->hasEqSgn = true;
+				break;
+			}
+			default: throw ParsingError("Equal sign may appear only inside"
+				" of a 'tag opening section', after attribute name. Between"
+				" atribute name and value, only one equal sign is allowed.");
+			}
+			break;
+		}
+		case ElemType::VALUE:
+		{
+			switch (prevElem->elemType)
+			{
+				// These are valid cases
+			case ElemType::EQUAL_SGN:
+			{
+				Value *v = static_cast<Value*>(e);
+				if (mostRecentTags.back()->attribs.at(mostRecentAttrib->name) != "NULL")
+					throw ParsingError("Attribute already has a value.");
+				mostRecentTags.back()->attribs[mostRecentAttrib->name] = v->value;
+				mostRecentAttrib->hasValue = true;
+				break;
+			}
+			default: throw ParsingError("Attribute value may appear"
+				" only after the equal sign.");
+			}
+			break;
+		}
+		case ElemType::GT:
+		{
+			switch (prevElem->elemType)
+			{
+				// These are valid cases
+			case ElemType::VALUE:
+			case ElemType::TAG_OPEN:
+			{
+				mostRecentTags.back()->hasClosingOfOpenSection = true;
+				break;
+			}
+			default: throw ParsingError("Closing of 'tag opening'section"
+				" may appear only after an attribute's value or after "
+				" a 'tag opening' - in case there is no attributes.");
+			}
+			break;
+		}
+		case ElemType::TAG_CLOSE:
+		{
+			switch (prevElem->elemType)
+			{
+				// These are valid cases
+			case ElemType::TAG_CLOSE:
+			case ElemType::GT:
+			{
+				TagClose *tc = static_cast<TagClose*>(e);
+				if (mostRecentTags.back()->name != tc->name)
+					throw ParsingError("Closing tag name doesn't match the opening tag name.");
+				mostRecentTags.back()->hasClosing = true;
+				mostRecentTags.pop_back();
+				break;
+			}
+			default: throw ParsingError("Closing tag may appear only"
+				" after another closing tag or after"
+				" closing of 'tag opening section'.");
+			}
+			break;
+		}
+		default:
+		{
+			throw ParsingError("Validation internal fatal ERROR. No such element.");
+		}
+		}
+
+		prevElem = e;
+	}
+
+	/* Final validation. Check if all tags are closed. Check if all attributes have
+	 * equal signs before the attribute value.*/
+	for (auto &e : listOfElems)
+	{
+		switch (e->elemType)
+		{
+		case ElemType::TAG_OPEN:
+		{
+			Tag *tag = static_cast<Tag*>(e);
+			if (!tag->hasClosing) throw ParsingError("Closing of tag missing.");
+			else if (!tag->hasClosingOfOpenSection)
+				throw ParsingError("Closing of 'tag opening section' missing.");
+		}
+		case ElemType::ATTRIB:
+		{
+			Attrib *a = static_cast<Attrib*>(e);
+			if (!a->hasEqSgn) throw ParsingError("Missing equal sign for attribute.");
+			if (!a->hasValue) throw ParsingError("Missing value for attribute.");
+		}
 		}
 	}
-};
-
-/* Main function for testing */
-int main() {
-
-	vector<string> lines;
-
-	/*
-	int nOfLines, nOfQueries;
-	cin >> nOfLines >> nOfQueries;
-	cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
-	string line;
-
-	 for (int i = 0; i < nOfLines; i++)
-	{
-		getline(cin, line);
-		lines.push_back(line);
-	}
-	*/
-
-	lines.push_back("<tag1 a1 = \"v1\">");
-	lines.push_back("<tag2 a2 = \"v2\">");
-	lines.push_back("<tag3 a3 = \"v3\" a4 = \"v4\">");
-	lines.push_back("<tag4 a1 = \"v33\" a2 = \"v44\">");
-	lines.push_back("</tag4>");
-	lines.push_back("</tag3>");
-	lines.push_back("</tag2>");
-	lines.push_back("</tag1>");
-
-	HRMLparser parser;
-	try {
-		parser.extractTagsAndAttribs(lines);
-		parser.validateElementsList();
-	}
-	catch (HRMLparser::HRLMParsingException e) {
-		cerr << e.what() << endl;
-	}
-	catch (...) {
-		cerr << "Unknown exception" << endl;
-	}
-
-	return 0;
 }
