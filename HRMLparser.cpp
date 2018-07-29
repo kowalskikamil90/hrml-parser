@@ -6,8 +6,20 @@
 /* Exception specific for a parser, exposed to a user of a library.*/
 ///////////////////////////////////////////////////////////
 
-HRMLparser::ParsingError::ParsingError(const char* str) { msg = str; }
-const char* HRMLparser::ParsingError::what() const { return this->msg; }
+/* Pass pointer to parser to get the Error Description.
+ * We want to keep exception class small so all error
+ * descriptions are stored in the HRLMparser class. */
+HRMLparser::ParsingError::ParsingError(HRMLparser *parser, string errCode):
+	errorCode(errCode)
+{
+	errorDes = parser->errorDescription[errorCode];
+}
+
+const char* HRMLparser::ParsingError::what() const { return errorDes.c_str();}
+
+string HRMLparser::ParsingError::getErrorCode() { return errorCode;}
+
+string HRMLparser::ParsingError::getErrorDescrition() {	return errorDes;}
 
 ///////////////////////////////////////////////////////////
 /* Private enum type */
@@ -115,27 +127,22 @@ bool HRMLparser::endsWith(string &s, char c)
 	else return false;
 }
 
-bool HRMLparser::isTagOpenningToken(string tok, bool closing)
+bool HRMLparser::isTagOpenningToken(string tok, bool &closing)
 {
+
 	if (tok.back() == '>')
 	{
 		closing = true;
 		tok.erase(tok.size() - 1);
 	}
 
-	if (startsWith(tok, '<'))
+	if (startsWith(tok, '<') && tok.at(1) != '/')
 	{
 		// At this point we know that we are dealing with a tag
-		if (closing) {
-			string tagName(tok.begin() + 1, tok.end() - 1);
-			if (isAlNum(tagName)) return true;
-			else ParsingError("Tag name may contain only alfanumeric characters.");
-		}
-		else {
-			string tagName(tok.begin() + 1, tok.end());
-			if (isAlNum(tagName)) return true;
-			else ParsingError("Tag name may contain only alfanumeric characters.");
-		}
+		string tagName(tok.begin() + 1, tok.end());
+
+		if (isAlNum(tagName)) return true;
+		else throw ParsingError(this, "E001");
 	}
 	return false;
 }
@@ -155,7 +162,7 @@ bool HRMLparser::isAttrib(string tok)
 		for (auto c : tok)
 		{
 			if (!isalnum(c)) {
-				throw ParsingError("Invalid attribute name. Only alfanumeric characters allowed.");
+				throw ParsingError(this, "E002");
 			}
 		}
 		return true;
@@ -163,7 +170,7 @@ bool HRMLparser::isAttrib(string tok)
 	return false;
 }
 
-bool HRMLparser::isValue(string tok, bool& closing)
+bool HRMLparser::isValue(string tok, bool &closing)
 {
 	if (tok.size() > 2) {
 		if (tok.back() == '>')
@@ -172,25 +179,25 @@ bool HRMLparser::isValue(string tok, bool& closing)
 			closing = true;
 		}
 
-		bool consideAsValue = false;
+		bool considerAsValue = false;
 
 		// Value must be surrounded by quote characters
 		if (startsWith(tok, "\"") && endsWith(tok, "\"")) {
-			consideAsValue = true;
+			considerAsValue = true;
 		}
 		else if (startsWith(tok, "\"") && !endsWith(tok, "\"")) {
-			consideAsValue = true;
-			throw ParsingError("Invalid attribute value. Missing ending quote character.");
+			considerAsValue = true;
+			throw ParsingError(this, "E003");
 		}
 		else if (!startsWith(tok, "\"") && endsWith(tok, "\"")) {
-			consideAsValue = true;
-			throw ParsingError("Invalid attribute value. Missing starting quote character.");
+			considerAsValue = true;
+			throw ParsingError(this, "E004");
 		}
 
-		if (consideAsValue && tok.size() >= 2) {
+		if (considerAsValue && tok.size() >= 2) {
 			string val(tok.begin() + 1, tok.end() - 1);
-			if (val.empty()) throw ParsingError("No attribute value specified between the quotes.");
-			if (!isAlNum(val)) throw ParsingError("Attribute value may consist of only alfanumeric characters.");
+			if (val.empty()) throw ParsingError(this, "E005");
+			if (!isAlNum(val)) throw ParsingError(this, "E006");
 			return true;
 		}
 		return false;
@@ -207,9 +214,7 @@ bool HRMLparser::isEqualSign(string tok)
 	if (tok.front() == '=')
 	{
 		if (tok.size() == 1) return true;
-		else throw ParsingError("Unexpected character after equal sign. "
-		                        "Equal sign must be space seperated from "
-		                        "attribute name and attribute value.");
+		else throw ParsingError(this, "E007");
 	}
 	else return false;
 }
@@ -220,7 +225,7 @@ bool HRMLparser::isGrThan(string tok)
 	if (tok.front() == '>')
 	{
 		if (tok.size() == 1) return true;
-		else throw ParsingError("Unexpected character after tag closing");
+		else throw ParsingError(this, "E008");
 	}
 	else return false;
 }
@@ -228,6 +233,34 @@ bool HRMLparser::isGrThan(string tok)
 ///////////////////////////////////////////////////////////
 /* Public methods */
 ///////////////////////////////////////////////////////////
+
+HRMLparser::HRMLparser()
+{
+	errorDescription["E001"] = "Tag name may contain only alfanumeric characters.";
+	errorDescription["E002"] = "Invalid attribute name. Only alfanumeric characters allowed.";
+	errorDescription["E003"] = "Invalid attribute value. Missing ending quote character.";
+	errorDescription["E004"] = "Invalid attribute value. Missing starting quote character.";
+	errorDescription["E005"] = "No attribute value specified between the quotes.";
+	errorDescription["E006"] = "Attribute value may consist of only alfanumeric characters.";
+	errorDescription["E007"] = "Unexpected character after equal sign. Equal sign must be space seperated from attribute name and attribute value.";
+	errorDescription["E008"] = "Unexpected character after tag closing.";
+	errorDescription["E009"] = "Parsing internal fatal ERROR. No such element.";
+	errorDescription["E010"] = "First element must be a tag-opening element.";
+	errorDescription["E011"] = "New tag may appear only after closing of a tag or within a tag as a subtag.";
+	errorDescription["E012"] = "Attribute with such name already exists for this tag.";
+	errorDescription["E013"] = "Attribute may appear only inside of a tag opening section, either directly after tag name or after previous attribute value.";
+	errorDescription["E014"] = "Equal sign may appear only inside of a 'tag opening section', after attribute name. Between atribute name and value, only one equal sign is allowed.";
+	errorDescription["E015"] = "Attribute already has a value.";
+	errorDescription["E016"] = "Attribute value may appear only after the equal sign.";
+	errorDescription["E017"] = "Closing of 'tag opening'section may appear only after an attribute's value or after a 'tag opening' - in case there is no attributes.";
+	errorDescription["E018"] = "Closing tag name doesn't match the opening tag name.";
+	errorDescription["E019"] = "Closing tag may appear only after another closing tag or after closing of 'tag opening section'.";
+	errorDescription["E020"] = "Validation internal fatal ERROR. No such element.";
+	errorDescription["E021"] = "Closing of tag missing.";
+	errorDescription["E022"] = "Closing of 'tag opening section' missing.";
+	errorDescription["E023"] = "Missing equal sign for attribute.";
+	errorDescription["E024"] = "Missing value for attribute.";
+}
 
 HRMLparser::~HRMLparser()
 {
@@ -249,11 +282,6 @@ void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
 
 	for (auto t : tokens)
 	{
-
-		if (t == "a3$43") {
-			int x = 5;
-		}
-
 		bool closing = false;
 
 		// opening of a tag
@@ -263,7 +291,8 @@ void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
 
 			if (closing)
 			{
-				tag->name = t.substr(1, t.size() - 1);
+				// Push a tag, firstly
+				tag->name = t.substr(1, t.size() - 2);
 				listOfElems.push_back(tag);
 
 				// Push also 'ending of a tag'
@@ -273,6 +302,7 @@ void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
 				listOfElems.push_back(e);
 			}
 			else {
+				// Push only a tag
 				tag->name = t.substr(1);
 				listOfElems.push_back(tag);
 			}
@@ -307,7 +337,7 @@ void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
 		// attribute value
 		else if (isValue(t, closing)) {
 			Value *v = new Value();
-			v->value = t.substr(1, t.size() - 3);
+			v->value = t.substr(1, t.size() - 2);
 			v->elemType = ElemType::VALUE;
 
 			listOfElems.push_back(v);
@@ -330,7 +360,7 @@ void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
 		}
 
 		else {
-			throw ParsingError("Parsing internal fatal ERROR. No such element.");
+			throw ParsingError(this, "E009");
 		}
 	}
 }
@@ -339,7 +369,7 @@ void HRMLparser::validateElementsList()
 {
 	Element *firstElem = listOfElems.at(0);
 	if (firstElem->elemType != ElemType::TAG_OPEN)
-		throw ParsingError("First element must be a tag-opening element.");
+		throw ParsingError(this, "E010");
 	else {
 		/* We can also use dynamic cast here, but we are sure at this point that
 		* we point to Tag so we can use static_cast as well.*/
@@ -370,8 +400,7 @@ void HRMLparser::validateElementsList()
 				mostRecentTags.push_back(nextTag);
 				break;
 			}
-			default: throw ParsingError("New tag may appear only"
-				" after closing of a tag or within a tag as a subtag.");
+			default: throw ParsingError(this, "E011");
 			}
 			break;
 		}
@@ -386,15 +415,12 @@ void HRMLparser::validateElementsList()
 				Attrib *a = static_cast<Attrib*>(e);
 				mostRecentAttrib = a;
 				if (mostRecentTags.back()->attribs.count(a->name) != 0)
-					throw ParsingError("Attribute with such name"
-						" already exists for this tag.");
+					throw ParsingError(this, "E012");
 				// No value parsed yet. For now assign NULL.
 				mostRecentTags.back()->attribs[a->name] = "NULL";
 				break;
 			}
-			default: throw ParsingError("Attribute may appear only"
-				" inside of a tag opening section, either directly"
-				" after tag name or after previous attribute value.");
+			default: throw ParsingError(this, "E013");
 			}
 			break;
 		}
@@ -408,9 +434,7 @@ void HRMLparser::validateElementsList()
 				mostRecentAttrib->hasEqSgn = true;
 				break;
 			}
-			default: throw ParsingError("Equal sign may appear only inside"
-				" of a 'tag opening section', after attribute name. Between"
-				" atribute name and value, only one equal sign is allowed.");
+			default: throw ParsingError(this, "E014");
 			}
 			break;
 		}
@@ -423,13 +447,12 @@ void HRMLparser::validateElementsList()
 			{
 				Value *v = static_cast<Value*>(e);
 				if (mostRecentTags.back()->attribs.at(mostRecentAttrib->name) != "NULL")
-					throw ParsingError("Attribute already has a value.");
+					throw ParsingError(this, "E015");
 				mostRecentTags.back()->attribs[mostRecentAttrib->name] = v->value;
 				mostRecentAttrib->hasValue = true;
 				break;
 			}
-			default: throw ParsingError("Attribute value may appear"
-				" only after the equal sign.");
+			default: throw ParsingError(this, "E016");
 			}
 			break;
 		}
@@ -444,9 +467,7 @@ void HRMLparser::validateElementsList()
 				mostRecentTags.back()->hasClosingOfOpenSection = true;
 				break;
 			}
-			default: throw ParsingError("Closing of 'tag opening'section"
-				" may appear only after an attribute's value or after "
-				" a 'tag opening' - in case there is no attributes.");
+			default: throw ParsingError(this, "E017");
 			}
 			break;
 		}
@@ -460,20 +481,18 @@ void HRMLparser::validateElementsList()
 			{
 				TagClose *tc = static_cast<TagClose*>(e);
 				if (mostRecentTags.back()->name != tc->name)
-					throw ParsingError("Closing tag name doesn't match the opening tag name.");
+					throw ParsingError(this, "E018");
 				mostRecentTags.back()->hasClosing = true;
 				mostRecentTags.pop_back();
 				break;
 			}
-			default: throw ParsingError("Closing tag may appear only"
-				" after another closing tag or after"
-				" closing of 'tag opening section'.");
+			default: throw ParsingError(this, "E019");
 			}
 			break;
 		}
 		default:
 		{
-			throw ParsingError("Validation internal fatal ERROR. No such element.");
+			throw ParsingError(this, "E020");
 		}
 		}
 
@@ -489,15 +508,15 @@ void HRMLparser::validateElementsList()
 		case ElemType::TAG_OPEN:
 		{
 			Tag *tag = static_cast<Tag*>(e);
-			if (!tag->hasClosing) throw ParsingError("Closing of tag missing.");
+			if (!tag->hasClosing) throw ParsingError(this, "E021");
 			else if (!tag->hasClosingOfOpenSection)
-				throw ParsingError("Closing of 'tag opening section' missing.");
+				throw ParsingError(this, "E022");
 		}
 		case ElemType::ATTRIB:
 		{
 			Attrib *a = static_cast<Attrib*>(e);
-			if (!a->hasEqSgn) throw ParsingError("Missing equal sign for attribute.");
-			if (!a->hasValue) throw ParsingError("Missing value for attribute.");
+			if (!a->hasEqSgn) throw ParsingError(this, "E023");
+			if (!a->hasValue) throw ParsingError(this, "E024");
 		}
 		}
 	}

@@ -20,10 +20,13 @@ public:
 
 	class ParsingError : public exception {
 	private:
-		const char *msg;
+		string errorDes;
+		string errorCode;
 	public:
-		ParsingError(const char* str);
+		ParsingError(HRMLparser *parser, string errCode);
 		const char* what() const override;
+		string getErrorCode();
+		string getErrorDescrition();
 	};
 
 	/////////////////////////////////////////////////////////////////////
@@ -32,6 +35,7 @@ public:
 
 	void validateElementsList();
 	void extractTagsAndAttribs(vector<string>& lines);
+	HRMLparser();
 	~HRMLparser();
 
 private:
@@ -60,6 +64,7 @@ private:
 	Tag *rootTag;
 	vector<string> tokens;
 	vector<Element*> listOfElems;
+	map<string, string> errorDescription;
 
 	/////////////////////////////////////////////////////////////////////
 	/* Private member functions */
@@ -71,10 +76,10 @@ private:
 	bool startsWith(string &s, string beg);
 	bool endsWith(string &s, string beg);
 	bool endsWith(string &s, char c);
-	bool isTagOpenningToken(string tok, bool closing);
+	bool isTagOpenningToken(string tok, bool &closing);
 	bool isTagClosingToken(string tok);
 	bool isAttrib(string tok);
-	bool isValue(string tok, bool& closing);
+	bool isValue(string tok, bool &closing);
 	bool isEqualSign(string tok);
 	bool isGrThan(string tok);
 };

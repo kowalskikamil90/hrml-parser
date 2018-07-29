@@ -20,13 +20,17 @@ int main() {
 	}
 	*/
 
-	lines.push_back("<tag1 a1 = \"v1\" >");
-	lines.push_back("<tag2 a2 = \"v2\" a343 = \"asd\" >");
-	lines.push_back("<tag3 a3 = \"v3\" a4 = \"v4\" >");
-	lines.push_back("<tag4 a1 = \"v33\" a2 = \"v44\">");
-	lines.push_back("</tag4>");
-	lines.push_back("</tag3>");
-	lines.push_back("</tag2>");
+	lines.push_back("<tag1 a1 = \"1VALa1\">");
+	lines.push_back("	<tag2 a1 = \"2VALa1\" a2 = \"2VALa2\">");
+	lines.push_back("		<tag3 a1 = \"3VALa1\" a2 = \"3VALa2\">");
+	lines.push_back("			<tag4 a1 = \"4VALa1\" a2 = \"4VALa2\">");
+	lines.push_back("			</tag4>");
+	lines.push_back("		</tag3>");
+	lines.push_back("	</tag2>");
+	lines.push_back("	<tag5>");
+	lines.push_back("	</tag5>");
+	lines.push_back("	<tag6 a1 = \"6VALa1\" >");
+	lines.push_back("	</tag6>"); 
 	lines.push_back("</tag1>");
 
 	HRMLparser parser;
@@ -35,10 +39,11 @@ int main() {
 		parser.validateElementsList();
 	}
 	catch (HRMLparser::ParsingError e) {
-		cerr << e.what() << endl;
+		cerr << "Error code: " << e.getErrorCode() << endl << endl;
+		cerr << "Error desc: " << e.what() << endl;
 	}
 	catch (...) {
-		cerr << "Unknown exception" << endl;
+		cerr << "Unknown exception" << endl << endl;
 	}
 
 	return 0;
