@@ -1,4 +1,3 @@
-#include "stdafx.h" 
 #include "HRMLparser.h"
 
 ///////////////////////////////////////////////////////////
@@ -170,7 +169,7 @@ bool HRMLparser::isAttrib(string tok)
 	return false;
 }
 
-bool HRMLparser::isValue(string tok, bool &closing)
+bool HRMLparser::isValue(string tok, bool closing)
 {
 	if (tok.size() > 2) {
 		if (tok.back() == '>')
@@ -299,9 +298,13 @@ void HRMLparser::extractTagsAndAttribs(vector<string>& lines)
 		// attribute value
 		else if (isValue(t, closing)) {
 			Value *v = new Value();
-			v->value = t.substr(1, t.size() - 2);
+			if (closing) {
+				v->value = t.substr(1, t.size() - 3);
+			}
+			else {
+				v->value = t.substr(1, t.size() - 2);
+			}
 			v->elemType = ElemType::VALUE;
-
 			listOfElems.push_back(v);
 
 			if (closing)

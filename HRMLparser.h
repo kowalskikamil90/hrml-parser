@@ -79,7 +79,7 @@ private:
 	bool isTagOpenningToken(string tok, bool &closing);
 	bool isTagClosingToken(string tok);
 	bool isAttrib(string tok);
-	bool isValue(string tok, bool &closing);
+	bool isValue(string tok, bool closing);
 	bool isEqualSign(string tok);
 	bool isGrThan(string tok);
 

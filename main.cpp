@@ -1,4 +1,3 @@
-#include "stdafx.h" 
 #include "HRMLparser.h"
 
 /* Main function for testing */
