@@ -362,6 +362,7 @@ protected:
 		delete parser;
 		delete bigHRMLmultilineDoc;
 		delete bigHRMLonelineDoc;
+		delete hugeHRMLmultilineDoc;
 	}
 
 	HRMLparser *parser;
