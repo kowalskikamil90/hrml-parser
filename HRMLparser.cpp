@@ -155,6 +155,7 @@ bool HRMLparser::isAttrib(string tok)
 {
 	if (!startsWith(tok, '<') &&
 		!startsWith(tok, '"') &&
+		!startsWith(tok, '>') &&
 		!startsWith(tok, '=') &&
 		!endsWith(tok, '"') &&
 		!endsWith(tok, '>')) {
@@ -171,7 +172,7 @@ bool HRMLparser::isAttrib(string tok)
 
 bool HRMLparser::isValue(string tok, bool closing)
 {
-	if (tok.size() > 2) {
+	if (tok.size() >= 2) {
 		if (tok.back() == '>')
 		{
 			tok.pop_back();
@@ -522,7 +523,7 @@ HRMLparser::HRMLparser()
 	errorDescription["E006"] = "Attribute value may consist of only alfanumeric characters.";
 	errorDescription["E007"] = "Unexpected character after equal sign. Equal sign must be space seperated from attribute name and attribute value.";
 	errorDescription["E008"] = "Unexpected character after tag closing.";
-	errorDescription["E009"] = "Parsing internal fatal ERROR. No such element.";
+	errorDescription["E009"] = "Invalid token. No such element.";
 	errorDescription["E010"] = "First element must be a tag-opening element.";
 	errorDescription["E011"] = "New tag may appear only after closing of a tag or within a tag as a subtag.";
 	errorDescription["E012"] = "Attribute with such name already exists for this tag.";

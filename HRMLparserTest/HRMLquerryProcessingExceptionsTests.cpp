@@ -35,12 +35,6 @@ protected:
 	vector<string> *HRMLdoc;
 };
 
-class DISABLED_HRMLquerryProcessingExceptionsExceptionsTests : public ::testing::Test {
-protected:
-	HRMLparser * parser;
-	vector<string> *HRMLdoc;
-};
-
 TEST_F(HRMLquerryProcessingExceptionsExceptionsTests, noAttributeDenotingCharacter1Test)
 {
 	try {

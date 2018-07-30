@@ -5,6 +5,22 @@
 
 using namespace std;
 
+/*
+ * Exception ErrorCodes that are not reproducable (and therefore nontestable):
+ * ["E015"] = "Attribute already has a value." - is not reachable
+ * ["E022"] = "Closing of 'tag opening section' missing." - is not reachable
+ * ["E023"] = "Missing equal sign for attribute." - is not reachable
+ * ["E024"] = "Missing value for attribute." - is not reachable
+ * "Is not reachable" means that the error is handled by some other exception ErrorCode
+ * beforehand and is not able to be reproduced.
+ *
+ * Exceptions that should not be (and are not) reproducable:
+ * ["E009"] = "Parsing internal fatal ERROR. No such element."
+ * ["E020"] = "Validation internal fatal ERROR. No such element."
+ * These ErrorCodes represent internal parser error. Fortunately,
+ * I was not able to reproduce them :)
+ */
+
 class HRMLvalidationExceptionsTests : public ::testing::Test {
 protected:
 	void SetUp() override {
@@ -18,17 +34,12 @@ protected:
 	HRMLparser *parser;
 };
 
-class DISABLED_HRMLvalidationExceptionsTests : public ::testing::Test {
-protected:
-	HRMLparser *parser;
-};
-
 TEST_F(HRMLvalidationExceptionsTests, tagNonalfanumericCharactersTest)
 {
 	vector<string> lines;
 
 	lines.push_back("<tag1 a1 = \"1VALa1\">");
-	// NOTE: tag name contains non-alfanumeric character
+	// NOTE: tag name contains non-alfanumeric characters
 	lines.push_back("	<ta%%g2 a1 = \"2VALa1\" a2 = \"2VALa2\">");
 	lines.push_back("		<tag3 a1 = \"3VALa1\" a2 = \"3VALa2\">");
 	lines.push_back("			<tag4 a1 = \"4VALa1\" a2 = \"4VALa2\">");
@@ -139,7 +150,7 @@ TEST_F(HRMLvalidationExceptionsTests, attributeValueMissingStartingQuoteTest)
 	}
 }
 
-TEST_F(DISABLED_HRMLvalidationExceptionsTests, attributeNoValueBetweenQuotesTest)
+TEST_F(HRMLvalidationExceptionsTests, attributeNoValueBetweenQuotesTest)
 {
 	vector<string> lines;
 
@@ -255,7 +266,7 @@ TEST_F(HRMLvalidationExceptionsTests, equalSignNotSeperatedFromAttributeOrValueT
 	}
 }
 
-TEST_F(DISABLED_HRMLvalidationExceptionsTests, unexpectedCharacterAfterTagClosingTest)
+TEST_F(HRMLvalidationExceptionsTests, unexpectedCharacterAfterTagClosing1Test)
 {
 	vector<string> lines;
 
@@ -263,8 +274,37 @@ TEST_F(DISABLED_HRMLvalidationExceptionsTests, unexpectedCharacterAfterTagClosin
 	lines.push_back("	<tag2 a1 = \"2VALa1\" a2 = \"2VALa2\">");
 	lines.push_back("		<tag3 a1 = \"3VALa1\" a2 = \"3VALa2\">");
 	// NOTE: Unexpected character after tag closing.
-	lines.push_back("			<tag4 a1 = \"4VALa1\" a2 = 4VALa2\">");
-	lines.push_back("			</tag4> a");
+	lines.push_back("			<tag4 a1 = \"4VALa1\" a2 = \"4VALa2\" >A");
+	lines.push_back("			</tag4>");
+	lines.push_back("		</tag3>");
+	lines.push_back("	</tag2>");
+	lines.push_back("	<tag5>");
+	lines.push_back("	</tag5>");
+	lines.push_back("	<tag6 a1 = \"6VALa1\" >");
+	lines.push_back("	</tag6>");
+	lines.push_back("</tag1>");
+
+	try {
+		parser->parseHRMLdocument(lines);
+	}
+	catch (HRMLparser::ParsingError &pe) {
+		ASSERT_STREQ(pe.getErrorCode().c_str(), "E008");
+	}
+	catch (...) {
+		FAIL() << "Unexpected exception cought...";
+	}
+}
+
+TEST_F(HRMLvalidationExceptionsTests, unexpectedCharacterAfterTagClosing2Test)
+{
+	vector<string> lines;
+
+	lines.push_back("<tag1 a1 = \"1VALa1\">");
+	lines.push_back("	<tag2 a1 = \"2VALa1\" a2 = \"2VALa2\">");
+	lines.push_back("		<tag3 a1 = \"3VALa1\" a2 = \"3VALa2\">");
+	// NOTE: Unexpected character after tag closing.
+	lines.push_back("			<tag4 a1 = \"4VALa1\" a2 = \"4VALa2\" >#$%");
+	lines.push_back("			</tag4>");
 	lines.push_back("		</tag3>");
 	lines.push_back("	</tag2>");
 	lines.push_back("	<tag5>");
@@ -1080,12 +1120,11 @@ TEST_F(HRMLvalidationExceptionsTests, closingOfTagMissingTest)
 	}
 }
 
-TEST_F(DISABLED_HRMLvalidationExceptionsTests, closingOfTagOpeningSectionMissing1Test)
+TEST_F(HRMLvalidationExceptionsTests, invalidTokenNoSuchElement1Test)
 {
 	vector<string> lines;
 
-	// NOTE: Closing of tag opening section missing.
-	lines.push_back("<tag1 a1 = \"1VALa1\" ");
+	lines.push_back("<tag1 a1 = \"1VALa1\">");
 	lines.push_back("	<tag2 a1 = \"2VALa1\" a2 = \"2VALa2\">");
 	lines.push_back("		<tag3 a1 = \"3VALa1\" a2 = \"3VALa2\">");
 	lines.push_back("			<tag4 a1 = \"4VALa1\" a2 = \"4VALa2\">");
@@ -1094,7 +1133,8 @@ TEST_F(DISABLED_HRMLvalidationExceptionsTests, closingOfTagOpeningSectionMissing
 	lines.push_back("	</tag2>");
 	lines.push_back("	<tag5>");
 	lines.push_back("	</tag5>");
-	lines.push_back("	<tag6 a1 = \"6VALa1\" >");
+	// NOTE: Attribute adjacent to the closing of 'tag opening section'.
+	lines.push_back("	<tag6 a1 = \"6VALa1\" attrib>");
 	lines.push_back("	</tag6>");
 	lines.push_back("</tag1>");
 
@@ -1102,49 +1142,19 @@ TEST_F(DISABLED_HRMLvalidationExceptionsTests, closingOfTagOpeningSectionMissing
 		parser->parseHRMLdocument(lines);
 	}
 	catch (HRMLparser::ParsingError &pe) {
-		ASSERT_STREQ(pe.getErrorCode().c_str(), "E022");
+		ASSERT_STREQ(pe.getErrorCode().c_str(), "E009");
 	}
 	catch (...) {
 		FAIL() << "Unexpected exception cought...";
 	}
 }
 
-TEST_F(DISABLED_HRMLvalidationExceptionsTests, closingOfTagOpeningSectionMissing2Test)
+TEST_F(HRMLvalidationExceptionsTests, invalidTokenNoSuchElement2Test)
 {
 	vector<string> lines;
 
 	lines.push_back("<tag1 a1 = \"1VALa1\">");
 	lines.push_back("	<tag2 a1 = \"2VALa1\" a2 = \"2VALa2\">");
-	// NOTE: Closing of tag opening section missing.
-	lines.push_back("		<tag3 a1 = \"3VALa1\" a2 = \"3VALa2\" ");
-	lines.push_back("			<tag4 a1 = \"4VALa1\" a2 = \"4VALa2\">");
-	lines.push_back("			</tag4>");
-	lines.push_back("		</tag3>");
-	lines.push_back("	</tag2>");
-	lines.push_back("	<tag5>");
-	lines.push_back("	</tag5>");
-	lines.push_back("	<tag6 a1 = \"6VALa1\" >");
-	lines.push_back("	</tag6>");
-	lines.push_back("</tag1>");
-
-	try {
-		parser->parseHRMLdocument(lines);
-	}
-	catch (HRMLparser::ParsingError &pe) {
-		ASSERT_STREQ(pe.getErrorCode().c_str(), "E022");
-	}
-	catch (...) {
-		FAIL() << "Unexpected exception cought...";
-	}
-}
-
-TEST_F(HRMLvalidationExceptionsTests, closingOfTagOpeningSectionMissing2Test)
-{
-	vector<string> lines;
-
-	lines.push_back("<tag1 a1 = \"1VALa1\">");
-	lines.push_back("	<tag2 a1 = \"2VALa1\" a2 = \"2VALa2\">");
-	// NOTE: Closing of tag opening section missing.
 	lines.push_back("		<tag3 a1 = \"3VALa1\" a2 = \"3VALa2\">");
 	lines.push_back("			<tag4 a1 = \"4VALa1\" a2 = \"4VALa2\">");
 	lines.push_back("			</tag4>");
@@ -1152,33 +1162,18 @@ TEST_F(HRMLvalidationExceptionsTests, closingOfTagOpeningSectionMissing2Test)
 	lines.push_back("	</tag2>");
 	lines.push_back("	<tag5>");
 	lines.push_back("	</tag5>");
-	lines.push_back("	<tag6 a1 = \"6VALa1\" >");
-	lines.push_back("	</tag6>");
+	lines.push_back("	<tag6 a1 = \"6VALa1\">");
+	// NOTE: Attribute adjacent to the closing of 'tag closing section'.
+	lines.push_back("	</tag6 attrib>");
 	lines.push_back("</tag1>");
 
 	try {
 		parser->parseHRMLdocument(lines);
 	}
 	catch (HRMLparser::ParsingError &pe) {
-		ASSERT_STREQ(pe.getErrorCode().c_str(), "E022");
+		ASSERT_STREQ(pe.getErrorCode().c_str(), "E009");
 	}
 	catch (...) {
 		FAIL() << "Unexpected exception cought...";
 	}
 }
-
-/* Exception ERRORS code that are not reproducable:
- * errorDescription["E005"] = "No attribute value specified between the quotes."; - should be tested
- * errorDescription["E008"] = "Unexpected character after tag closing."; - should be tested
- * errorDescription["E015"] = "Attribute already has a value."; - may not be reachable
- * errorDescription["E022"] = "Closing of 'tag opening section' missing."; - should be tested, throws E011 or E016, may not be reachable
- * errorDescription["E023"] = "Missing equal sign for attribute."; - may not be reachable
- * errorDescription["E024"] = "Missing value for attribute."; - may not be reachable
- * 
- * Exceptions that should not be reproducable:
- * errorDescription["E009"] = "Parsing internal fatal ERROR. No such element.";
- * errorDescription["E020"] = "Validation internal fatal ERROR. No such element.";
- *
- * Exceptions that should not be reproducable but are:
- * errorDescription["E009"] = "Parsing internal fatal ERROR. No such element."; //e.g "... attrib>"
- */
