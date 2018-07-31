@@ -12,13 +12,8 @@ using namespace std;
  * ["E023"] = "Missing equal sign for attribute." - is not reachable
  * ["E024"] = "Missing value for attribute." - is not reachable
  * "Is not reachable" means that the error is handled by some other exception ErrorCode
- * beforehand and is not able to be reproduced.
- *
- * Exceptions that should not be (and are not) reproducable:
- * ["E009"] = "Parsing internal fatal ERROR. No such element."
- * ["E020"] = "Validation internal fatal ERROR. No such element."
- * These ErrorCodes represent internal parser error. Fortunately,
- * I was not able to reproduce them :)
+ * beforehand and is not able to be reproduced. This is not a bug but additional
+ * safequard.
  */
 
 class HRMLvalidationExceptionsTests : public ::testing::Test {

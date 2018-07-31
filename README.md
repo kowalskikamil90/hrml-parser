@@ -6,19 +6,21 @@ The opening tags follow the format: <tag-name attribute1-name = "value1" attribu
 
 The closing tags follow the format: < / tag-name>
 
+# QUERRY INTERPRETER (QI)
 In the QUERRY INTERPRETER the attributes are referenced as (e.g.):
 
 tag1 ~ value
 
 tag1.tag2 ~ name
 
-# Blackbox testcases (gtest)
-
-![](https://github.com/kowalskikamil90/hrml-parser/blob/master/demo/testOutput.png)
-
 The tool parses HRML document and internally generates a DOM (document object model) that later on may be accessed by a querry interpreter (which is also a part of this tool).
 
-# CURRENTLY, FOLLOWING EXCEPTION CODE ERRORS ARE AVAILABLE FOR THE CLIENT:
+# BLACKBOX TESTS (gtest)
+![](https://github.com/kowalskikamil90/hrml-parser/blob/master/demo/testOutput.png)
+
+# EXCEPTION ERROR CODES:
+
+CURRENTLY, FOLLOWING EXCEPTION CODE ERRORS ARE AVAILABLE FOR THE CLIENT:
 
 ["E001"] = "Tag name may contain only alfanumeric characters."
 
@@ -35,8 +37,6 @@ The tool parses HRML document and internally generates a DOM (document object mo
 ["E007"] = "Unexpected character after equal sign. Equal sign must be space seperated from attribute name and attribute value."
 
 ["E008"] = "Unexpected character after tag closing."
-
-["E009"] = "Parsing internal fatal ERROR. No such element."
 
 ["E010"] = "First element must be a tag-opening element."
 
@@ -57,8 +57,6 @@ The tool parses HRML document and internally generates a DOM (document object mo
 ["E018"] = "Closing tag name doesn't match the opening tag name."
 
 ["E019"] = "Closing tag may appear only after another closing tag or after closing of 'tag opening section'."
-
-["E020"] = "Validation internal fatal ERROR. No such element."
 
 ["E021"] = "Closing of tag missing."
 
