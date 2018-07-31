@@ -73,3 +73,8 @@ CURRENTLY, FOLLOWING EXCEPTION CODE ERRORS ARE AVAILABLE FOR THE CLIENT:
 ["Q003"] = "Such child tag does not exist."
 
 ["Q004"] = "Such attribute does not exist for specified tag."
+
+# EXEMPLARY HRML document
+
+![](https://github.com/kowalskikamil90/hrml-parser/blob/master/demo/HRMLexample.png)
+
